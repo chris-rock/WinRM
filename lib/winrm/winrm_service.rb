@@ -53,6 +53,7 @@ module WinRM
     end
 
     def init_negotiate_transport(opts)
+      require 'rubyntlm'
       HTTP::HttpNegotiate.new(opts[:endpoint], opts[:user], opts[:pass], opts)
     end
 
