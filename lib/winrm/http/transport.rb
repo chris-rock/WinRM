@@ -152,8 +152,8 @@ module WinRM
         no_ssl_peer_verification! if opts[:no_ssl_peer_verification]
       end
 
-      def send_request(message)
-        init_auth if @ntlmcli.session.nil?
+      def send_request(message, auth_header = nil)
+        auth_header = init_auth if @ntlmcli.session.nil?
 
         original_length = message.length
 
@@ -162,9 +162,9 @@ module WinRM
         seal = "\x10\x00\x00\x00#{signature}#{emessage}"
 
         hdr = {
-          "Connection" => "Keep-Alive",
           "Content-Type" => "multipart/encrypted;protocol=\"application/HTTP-SPNEGO-session-encrypted\";boundary=\"Encrypted Boundary\""
         }
+        hdr.merge!(auth_header) if auth_header
 
         body = [
           "--Encrypted Boundary",
@@ -179,8 +179,7 @@ module WinRM
         resp = @httpcli.post(@endpoint, body, hdr)
         if resp.status == 401 && @retryable
           @retryable = false
-          init_auth
-          send_request(message)
+          send_request(message, init_auth)
         else
           @retryable = true
           handler = WinRM::ResponseHandler.new(winrm_decrypt(resp.body), resp.status)
@@ -207,18 +206,13 @@ module WinRM
         @logger.debug "Initializing Negotiate for #{@service}"
         auth1 = @ntlmcli.init_context
         hdr = {"Authorization" => "Negotiate #{auth1.encode64}",
-               "Connection" => "Keep-Alive",
                "Content-Type" => "application/soap+xml;charset=UTF-8"
         }
         @logger.debug "Sending HTTP POST for Negotiate Authentication"
         r = @httpcli.post(@endpoint, "", hdr)
         itok = r.header["WWW-Authenticate"].pop.split.last
         auth3 = @ntlmcli.init_context itok
-        hdr = {"Authorization" => "Negotiate #{auth3.encode64}",
-          "Connection" => "Keep-Alive",
-          "Content-Type" => "application/soap+xml;charset=UTF-8"
-        }
-        @httpcli.post(@endpoint, "", hdr)
+        { "Authorization" => "Negotiate #{auth3.encode64}" }
       end
     end
 
