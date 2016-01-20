@@ -182,7 +182,8 @@ module WinRM
           send_request(message, init_auth)
         else
           @retryable = true
-          handler = WinRM::ResponseHandler.new(winrm_decrypt(resp.body), resp.status)
+          decrypted_body = resp.body.empty? ? '' : winrm_decrypt(resp.body)
+          handler = WinRM::ResponseHandler.new(decrypted_body, resp.status)
           handler.parse_to_xml()
         end
       end
