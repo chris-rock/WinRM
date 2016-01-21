@@ -146,8 +146,14 @@ module WinRM
       def initialize(endpoint, user, pass, opts)
         super(endpoint)
         no_sspi_auth!
-        @user, @pass = user, pass
-        @ntlmcli = Net::NTLM::Client.new(user, pass)
+
+        user_parts = user.split('\\')
+        if(user_parts.length > 1)
+          opts[:domain] = user_parts[0]
+          user = user_parts[1]
+        end
+
+        @ntlmcli = Net::NTLM::Client.new(user, pass, opts)
         @retryable = true
         no_ssl_peer_verification! if opts[:no_ssl_peer_verification]
       end
